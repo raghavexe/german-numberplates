@@ -148,7 +148,6 @@
   { "initials": "FT", "city": "Frankenthal/Pfalz", "state": "Rheinland-Pfalz" },
   { "initials": "FTL", "city": "Freital", "state": "Sachsen" },
   { "initials": "FÜ", "city": "Fürth", "state": "Bayern" },
-  
   { "initials": "FW", "city": "Fürstenwalde", "state": "Brandenburg" },
   { "initials": "G", "city": "Gera", "state": "Thüringen" },
   { "initials": "GA", "city": "Gardelegen", "state": "Sachsen-Anhalt" },
@@ -299,9 +298,6 @@
     { "initials": "MC", "city": "Mittweida", "state": "Sachsen" },
     { "initials": "MD", "city": "Magdeburg", "state": "Sachsen-Anhalt" },
     { "initials": "ME", "city": "Mettmann / Mettmann", "state": "Nordrhein-Westfalen" },
-
-  
-
     { "initials": "MEI", "city": "Meißen", "state": "Saxony" },
     { "initials": "MEK", "city": "Mittlerer Erzgebirgskreis", "state": "Saxony" },
     { "initials": "MER", "city": "Merseburg", "state": "Saxony-Anhalt" },
