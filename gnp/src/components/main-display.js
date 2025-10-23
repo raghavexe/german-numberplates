@@ -18,7 +18,6 @@ export default function CenterBox() {
       alert("No match found!");
     }
   };
-  var map = L.map("map");
 
   return (
     <div className="flex items-center justify-center min-h-screen p-6 mt-8">
