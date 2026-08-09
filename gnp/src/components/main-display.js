@@ -48,6 +48,25 @@ const stateMapImages = {
   Thüringen: Thüringen,
 };
 
+// The source data mixes German and English state names for the same
+// state (e.g. "Hesse" vs "Hessen"). Normalize so every entry resolves
+// to the correct flag image instead of silently showing no flag.
+const stateNameAliases = {
+  Hesse: "Hessen",
+  "Rhineland-Palatinate": "Rheinland-Pfalz",
+  Saxony: "Sachsen",
+  "Saxony-Anhalt": "Sachsen-Anhalt",
+  Thuringia: "Thüringen",
+};
+
+const normalizeState = (state) => stateNameAliases[state] || state;
+
+const QUICK_SEARCHES = ["B", "M", "K", "F", "HH", "S", "D", "L"];
+
+const STATE_COUNT = new Set(
+  Data.map((item) => normalizeState(item.state)).filter((s) => s !== "N/A" && s !== "Germany")
+).size;
+
 const MAX_SUGGESTIONS = 6;
 
 export default function CenterBox() {
@@ -108,7 +127,8 @@ export default function CenterBox() {
     inputRef.current?.focus();
   };
 
-  const flagImage = result ? stateMapImages[result.state] : null;
+  const normalizedState = result ? normalizeState(result.state) : null;
+  const flagImage = result ? stateMapImages[normalizedState] : null;
 
   return (
     <div className="flex items-center justify-center w-full px-0 sm:px-4">
@@ -177,11 +197,45 @@ export default function CenterBox() {
           )}
         </div>
 
+        {/* Quick searches */}
+        {!result && !error && (
+          <div className="flex flex-wrap items-center justify-center gap-2 -mt-1">
+            <span className="text-xs text-gray-600/80 mr-1">Try:</span>
+            {QUICK_SEARCHES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => {
+                  setQuery(code);
+                  runSearch(code);
+                }}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/70 text-blue-800 hover:bg-white transition-colors"
+              >
+                {code}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Inline error */}
         {error && (
           <p className="w-full text-center text-sm text-red-100 bg-red-500/80 rounded-lg py-2 px-3">
             {error}
           </p>
+        )}
+
+        {/* Empty state */}
+        {!result && !error && (
+          <div className="w-full rounded-xl border-2 border-dashed border-white/40 py-10 px-6 flex flex-col items-center gap-2 text-center">
+            <span className="text-4xl">🚗</span>
+            <p className="text-white font-medium">
+              Search a code to see it here
+            </p>
+            <p className="text-blue-100/80 text-sm max-w-xs">
+              We cover {STATE_COUNT} German states and {Data.length} district &amp; city
+              codes — from big cities to tiny rural counties.
+            </p>
+          </div>
         )}
 
         {/* Result */}
@@ -191,7 +245,7 @@ export default function CenterBox() {
             <div className="bg-gray-100 rounded-xl w-full md:w-1/2 p-4 flex flex-col gap-3 text-center">
               <p className="text-gray-800 text-xl font-bold">{result.city}</p>
               <p className="text-gray-500 text-sm uppercase tracking-wide">
-                {result.state === "N/A" ? "Special registration" : result.state}
+                {normalizedState === "N/A" ? "Special registration" : normalizedState}
               </p>
 
               <div className="mt-2 h-56 sm:h-72 md:h-80 w-full rounded-lg overflow-hidden bg-gray-200 relative">
