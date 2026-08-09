@@ -1,11 +1,14 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 export default function CityMap({ city }) {
+  const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   // inline SVG pin -> data URL (no external assets)
   const getSvgDataUrl = (fill = "#d00") => {
@@ -17,80 +20,128 @@ export default function CityMap({ city }) {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
+  // Initialize map once
   useEffect(() => {
-    // Initialize map once
-    if (!mapRef.current) {
-      const map = L.map("city-map", {
-        zoomControl: true,
-        attributionControl: true,
-      });
-      mapRef.current = map;
+    if (mapRef.current) return;
 
-      // Fit Germany bounds so map always shows Germany
-      const bounds = L.latLngBounds([47.2701, 5.8663], [55.0581, 15.0419]);
-      map.fitBounds(bounds);
+    const map = L.map("city-map", {
+      zoomControl: true,
+      attributionControl: true,
+    });
+    mapRef.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 18,
-      }).addTo(map);
+    // Fit Germany bounds so map always shows Germany
+    const bounds = L.latLngBounds([47.2701, 5.8663], [55.0581, 15.0419]);
+    map.fitBounds(bounds);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Fix for maps rendering before their container has final layout
+    // dimensions (common on mobile / inside flex/grid containers).
+    const invalidate = () => map.invalidateSize();
+    setTimeout(invalidate, 0);
+    setTimeout(invalidate, 250);
+
+    let resizeObserver;
+    if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => invalidate());
+      resizeObserver.observe(containerRef.current);
     }
+    window.addEventListener("resize", invalidate);
 
-    // If no city selected, clear marker and return
+    return () => {
+      window.removeEventListener("resize", invalidate);
+      resizeObserver?.disconnect();
+    };
+  }, []);
+
+  // Update marker whenever city changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    setNotFound(false);
+
     if (!city) {
       if (markerRef.current) {
-        mapRef.current.removeLayer(markerRef.current);
+        map.removeLayer(markerRef.current);
         markerRef.current = null;
       }
       return;
     }
 
-    // Helper: geocode city (Nominatim restricted to Germany)
+    let cancelled = false;
+
     async function getCityCoordinates(cityName) {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&countrycodes=de&q=${encodeURIComponent(
           cityName
         )}`
       );
+      if (!res.ok) throw new Error("Geocoding request failed");
       const data = await res.json();
       if (!data || data.length === 0) throw new Error("City not found");
       return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
     }
 
     async function addMarker() {
+      setLoading(true);
       try {
         const { lat, lon } = await getCityCoordinates(city);
+        if (cancelled) return;
 
-        // remove old marker if exists
         if (markerRef.current) {
-          mapRef.current.removeLayer(markerRef.current);
+          map.removeLayer(markerRef.current);
           markerRef.current = null;
         }
 
-        const svgUrl = getSvgDataUrl("#d00"); // red pin
         const svgIcon = L.icon({
-          iconUrl: svgUrl,
+          iconUrl: getSvgDataUrl("#d00"),
           iconSize: [32, 48],
           iconAnchor: [16, 48],
           popupAnchor: [0, -46],
         });
 
-        // create marker without popup
         const m = L.marker([lat, lon], {
           icon: svgIcon,
           interactive: true,
-        }).addTo(mapRef.current);
+        }).addTo(map);
 
         markerRef.current = m;
+        map.flyTo([lat, lon], 11, { duration: 0.8 });
       } catch (err) {
-        console.error("Geocode/marker error:", err);
+        if (!cancelled) {
+          console.error("Geocode/marker error:", err);
+          setNotFound(true);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
     addMarker();
 
-    return () => {};
+    return () => {
+      cancelled = true;
+    };
   }, [city]);
 
-  return <div id="city-map" className="w-full h-full" />;
+  return (
+    <div ref={containerRef} className="relative w-full h-full">
+      <div id="city-map" className="w-full h-full" />
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm text-gray-600 pointer-events-none">
+          Locating on map…
+        </div>
+      )}
+      {notFound && !loading && (
+        <div className="absolute bottom-2 left-2 right-2 text-center text-xs bg-red-500/90 text-white rounded-md py-1 px-2">
+          Couldn&apos;t pin this location on the map
+        </div>
+      )}
+    </div>
+  );
 }
